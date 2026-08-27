@@ -4,28 +4,48 @@
         return;
     }
 
-    // 1. BLOKIR POPUP / REDIRECT SEJAK AWAL
-    window.open = function() { return null; };
-    
-    // 2. SUN SUNTIK CSS PEMBLOKIR IKLAN SECARA INSTAN (Sembunyikan semua elemen iklan & AliExpress)
+    // =========================================================================
+    // 1. BLOKIR POPUNDER, TAB BARU, & EVENT HIJACKING (SOLUSI AY267.COM)
+    // =========================================================================
+    // Netralkan window.open
+    window.open = function() { return { focus: function(){} }; };
+
+    // Sembunyikan elemen transparan penutup layar (popunder overlay)
     const hideAdsStyle = document.createElement('style');
     hideAdsStyle.id = "bagasxit-adblock-css";
     hideAdsStyle.innerHTML = `
         ins, iframe, 
         [id*="google_ads"], [class*="ads-"], [id*="ad-"], 
         .popunder, .popup, 
-        a[href*="aliexpress"], img[src*="aliexpress"], [class*="aliexpress"], [id*="aliexpress"],
-        div[style*="z-index: 9999"], div[style*="z-index: 2147483647"] {
+        a[href*="aliexpress"], img[src*="aliexpress"],
+        div[style*="position: fixed"][style*="z-index"],
+        div[style*="position: absolute"][style*="z-index: 999"] {
             display: none !important; 
             visibility: hidden !important; 
-            opacity: 0 !important;
-            height: 0 !important; 
             pointer-events: none !important;
         }
     `;
     (document.head || document.documentElement).appendChild(hideAdsStyle);
 
-    // 3. INPUT KEY
+    // Hentikan eksekusi script penangkap klik (click-jacking)
+    const stopPropagation = function(e) {
+        if (e.target.closest('#bagasxit-root-container') || e.target.closest('#bagasxit-fab-container')) {
+            return; // Izinkan klik pada UI BagasXit
+        }
+        e.stopPropagation();
+    };
+    
+    // Tangkap klik sebelum script iklan memprosesnya
+    window.addEventListener('click', function(e) {
+        if (e.target.tagName === 'A' && (e.target.href.includes('afu.php') || e.target.href.includes('ay267'))) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, true);
+
+    // =========================================================================
+    // 2. INPUT KEY
+    // =========================================================================
     const SECRET_KEY = "BAGASXIT2026";
     const URL_WHATSAPP = "https://whatsapp.com/channel/0029Vb6Eyam7oQhZLQKN9E3P";
     const URL_TELEGRAM = "https://t.me/BagasXIT";
@@ -33,7 +53,6 @@
     const userKey = prompt("Masukkan Key Akses BAGASXIT:");
 
     if (userKey === null || userKey.trim() !== SECRET_KEY) {
-        // Jika Key Salah/Batal, batalkan injeksi & hapus CSS Adblock
         if (userKey !== null) alert("❌ KEY SALAH! Akses ditolak.");
         hideAdsStyle.remove();
         return;
@@ -41,24 +60,17 @@
 
     window.bagasXitLoaded = true;
 
-    // 4. BYPASS ADBLOCK DETECTOR & ADS VARIABLE
-    window.google_ad_client = true;
-    window.pubads = window.pubads || { addEventListener: function(){} };
-    window.adsbygoogle = window.adsbygoogle || [];
-    window.adsbygoogle.loaded = true;
-    window.canRunAds = true;
-    window.isAdBlockActive = false;
-
-    // 5. OBSERVER UNTUK MENGHAPUS ELEMEN IKLAN SECARA REALTIME SAAT HALAMAN DILOAD
+    // =========================================================================
+    // 3. CLEAN DOM & REMOVE OVERLAYS
+    // =========================================================================
     const cleanDOM = () => {
-        // Hapus elemen iklan dari DOM
-        const adSelectors = '[class*="adblock"], [id*="adblock"], [class*="anti-adblock"], [id*="anti-adblock"], .adb-overlay, #adb-modal, a[href*="aliexpress"], img[src*="aliexpress"]';
-        document.querySelectorAll(adSelectors).forEach(el => el.remove());
-        
-        // Anti Click-Hijack pada Link
-        document.querySelectorAll('a').forEach(anchor => {
-            if (anchor.href && anchor.href.includes('aliexpress')) {
-                anchor.remove();
+        // Hapus elemen pelapis transparan tempat iklan menempel
+        document.querySelectorAll('div, a').forEach(el => {
+            const style = window.getComputedStyle(el);
+            if (style.position === 'fixed' && style.zIndex > 1000 && !el.closest('#bagasxit-root-container') && !el.closest('#bagasxit-fab-container')) {
+                if (el.offsetWidth >= window.innerWidth * 0.8 && el.offsetHeight >= window.innerHeight * 0.8) {
+                    el.remove();
+                }
             }
         });
         document.body.style.overflow = 'auto';
@@ -68,7 +80,9 @@
     const observer = new MutationObserver(cleanDOM);
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
-    // 6. ANIMASI NEON GLOW & FAB
+    // =========================================================================
+    // 4. ANIMASI NEON GLOW & FAB
+    // =========================================================================
     const style = document.createElement('style');
     style.innerHTML = `
         .bagasxit-glow-bar { position: fixed; left: 0; width: 100%; height: 3px; background: #2A0845; z-index: 99999; overflow: hidden; }
@@ -126,7 +140,7 @@
     // TOAST NOTIFIKASI SUKSES
     const toast = document.createElement('div');
     toast.style = "position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(18,11,36,0.95); color:#E040FB; border:1px solid #8E24AA; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold; z-index:100001; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.5);";
-    toast.innerText = "⚡ KEY VALID! ADS CLEARED & ACTIVE";
+    toast.innerText = "⚡ KEY VALID! POPUNDER BLOCKED";
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 })();
