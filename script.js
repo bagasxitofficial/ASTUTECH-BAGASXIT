@@ -5,35 +5,54 @@
     }
 
     // =========================================================================
-    // 1. DUMP & NETRALKAN EVENT LISTENER IKLAN (POPUNDER KILLER)
+    // 1. BLOKIR TOTAL PEMBUATAN TAB BARU & REDIRECT OTOMATIS
     // =========================================================================
-    // Matikan pemanggilan fungsi redirect otomatis
-    window.open = function() { return null; };
-    delete window.ontouchstart;
-    delete window.onclick;
+    // Matikan window.open dan ubah menjadi dummy object yang tidak merespons
+    window.open = function() { return { focus: function(){}, close: function(){} }; };
+    
+    // Cegah script iklan mengubah location.href atau location.assign ke domain asing
+    const originalAssign = window.location.assign;
+    const originalReplace = window.location.replace;
+    
+    window.location.assign = function(url) {
+        if (url.includes('ay267') || url.includes('afu.php') || url.includes('qqslot') || url.includes('google.com/search')) return;
+        originalAssign.call(window.location, url);
+    };
+
+    window.location.replace = function(url) {
+        if (url.includes('ay267') || url.includes('afu.php') || url.includes('qqslot') || url.includes('google.com/search')) return;
+        originalReplace.call(window.location, url);
+    };
+
+    // Bersihkan listener klik bawaan halaman pada level DOM
+    document.body.onclick = null;
     document.onclick = null;
-    document.ontouchstart = null;
+    window.onclick = null;
 
-    // Hentikan propagasi event jika klik bukan ke tombol/input resmi
-    const killPopunder = function(e) {
-        const path = e.composedPath ? e.composedPath() : [];
-        let isLegitElement = false;
+    // Hentikan intercept klik dari script iklan (terutama ay267 / afu.php)
+    const blockJunkClicks = function(e) {
+        let path = e.composedPath ? e.composedPath() : [];
+        let isUI = false;
 
-        // Cek apakah area yang diklik adalah tombol valid (Discord, Login, atau UI BagasXit)
         for (let el of path) {
-            if (el.id === 'bagasxit-root-container' || 
-                el.id === 'bagasxit-fab-container' || 
-                (el.tagName === 'A' && el.href && (el.href.includes('discord') || el.href.includes('unlockffbeta'))) ||
-                el.tagName === 'BUTTON' || 
-                el.tagName === 'INPUT' ||
-                el.tagName === 'LABEL') {
-                isLegitElement = true;
+            if (el.id === 'bagasxit-root-container' || el.id === 'bagasxit-fab-container') {
+                isUI = true;
+                break;
+            }
+            // Izinkan interaksi ke tombol asli situs
+            if (el.tagName === 'A' || el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'LABEL') {
+                if (el.href && (el.href.includes('ay267') || el.href.includes('afu.php'))) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+                isUI = true;
                 break;
             }
         }
 
-        // Jika mengeklik area luar/kosong (tempat jebakan popunder berada), hentikan klik sepenuhnya
-        if (!isLegitElement) {
+        // Jika klik terjadi di area kosong (jebakan popunder), hentikan event
+        if (!isUI) {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
@@ -41,10 +60,10 @@
         }
     };
 
-    // Tangkap semua tipe gesture di Capturing Phase (Level Paling Luar)
-    ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown'].forEach(eventType => {
-        window.addEventListener(eventType, killPopunder, true);
-        document.addEventListener(eventType, killPopunder, true);
+    // Pasang blocker di Capturing Phase (sebelum event sampai ke script iklan)
+    ['click', 'touchstart', 'touchend', 'pointerdown', 'mousedown'].forEach(evt => {
+        window.addEventListener(evt, blockJunkClicks, true);
+        document.addEventListener(evt, blockJunkClicks, true);
     });
 
     // =========================================================================
@@ -64,7 +83,7 @@
     window.bagasXitLoaded = true;
 
     // =========================================================================
-    // 3. PEMBERSIH OVERLAY & IFRAME TERSEMBUNYI
+    // 3. SAPU BERSIH IFRAME & OVERLAY TRANSPARAN
     // =========================================================================
     const cleanDOM = () => {
         if (!document.getElementById("bagasxit-adblock-css")) {
@@ -75,7 +94,7 @@
                 [id*="google_ads"], [class*="ads-"], [id*="ad-"], 
                 .popunder, .popup, 
                 a[href*="aliexpress"], img[src*="aliexpress"],
-                a[href*="koko"], a[href*="rtp"], a[href*="afu.php"] {
+                a[href*="koko"], a[href*="rtp"], a[href*="afu.php"], a[href*="ay267"] {
                     display: none !important;
                     pointer-events: none !important;
                 }
@@ -83,7 +102,7 @@
             (document.head || document.documentElement).appendChild(hideAdsStyle);
         }
 
-        // Hapus paksa semua lapisan transparan yang menutupi layar
+        // Hapus elemen transparan pembungkus layar
         document.querySelectorAll('div, a, span, iframe').forEach(el => {
             if (el.closest('#bagasxit-root-container') || el.closest('#bagasxit-fab-container')) return;
 
@@ -163,7 +182,7 @@
     // TOAST NOTIFIKASI
     const toast = document.createElement('div');
     toast.style = "position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(18,11,36,0.95); color:#E040FB; border:1px solid #8E24AA; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold; z-index:999999; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.5);";
-    toast.innerText = "⚡ V4 POPUNDER & REDIRECT BLOCKED!";
+    toast.innerText = "⚡ V5 ULTIMATE SHIELD ACTIVE!";
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 })();
