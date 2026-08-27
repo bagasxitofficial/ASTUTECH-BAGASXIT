@@ -5,66 +5,40 @@
     }
 
     // =========================================================================
-    // 1. BLOKIR TOTAL PEMBUATAN TAB BARU & REDIRECT OTOMATIS
+    // 1. NEUTRALISASI REDIRECT & POPUP TAB BARU TANPA MERUSAK EVENT KLIK NATIF
     // =========================================================================
-    // Matikan window.open dan ubah menjadi dummy object yang tidak merespons
-    window.open = function() { return { focus: function(){}, close: function(){} }; };
-    
-    // Cegah script iklan mengubah location.href atau location.assign ke domain asing
-    const originalAssign = window.location.assign;
-    const originalReplace = window.location.replace;
-    
-    window.location.assign = function(url) {
-        if (url.includes('ay267') || url.includes('afu.php') || url.includes('qqslot') || url.includes('google.com/search')) return;
-        originalAssign.call(window.location, url);
+    // Block window.open (pembukaan tab iklan baru)
+    window.open = function() { 
+        console.log("BAGASXIT: Blocked popup attempt.");
+        return null; 
     };
 
-    window.location.replace = function(url) {
-        if (url.includes('ay267') || url.includes('afu.php') || url.includes('qqslot') || url.includes('google.com/search')) return;
-        originalReplace.call(window.location, url);
+    // Amankan perubahan URL lokasi agar tidak di-hijack oleh domain jebakan
+    const isBadUrl = (url) => {
+        if (!url) return false;
+        const str = String(url).toLowerCase();
+        return str.includes('ay267') || str.includes('afu.php') || str.includes('qqslot') || str.includes('google.com/search?q=');
     };
 
-    // Bersihkan listener klik bawaan halaman pada level DOM
-    document.body.onclick = null;
-    document.onclick = null;
-    window.onclick = null;
+    // Prevent direct assignment hijacking
+    try {
+        let currentLoc = window.location.href;
+        Object.defineProperty(window, 'onbeforeunload', {
+            configurable: true,
+            get: function() { return null; },
+            set: function() {}
+        });
+    } catch(e) {}
 
-    // Hentikan intercept klik dari script iklan (terutama ay267 / afu.php)
-    const blockJunkClicks = function(e) {
-        let path = e.composedPath ? e.composedPath() : [];
-        let isUI = false;
-
-        for (let el of path) {
-            if (el.id === 'bagasxit-root-container' || el.id === 'bagasxit-fab-container') {
-                isUI = true;
-                break;
-            }
-            // Izinkan interaksi ke tombol asli situs
-            if (el.tagName === 'A' || el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'LABEL') {
-                if (el.href && (el.href.includes('ay267') || el.href.includes('afu.php'))) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return false;
-                }
-                isUI = true;
-                break;
-            }
+    // Penetralan klik paksa yang diciptakan oleh script iklan (Element.click Hijack)
+    const originalClick = HTMLElement.prototype.click;
+    HTMLElement.prototype.click = function() {
+        if (this.tagName === 'A' && isBadUrl(this.href)) {
+            console.log("BAGASXIT: Blocked fake link click");
+            return;
         }
-
-        // Jika klik terjadi di area kosong (jebakan popunder), hentikan event
-        if (!isUI) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            return false;
-        }
+        return originalClick.apply(this, arguments);
     };
-
-    // Pasang blocker di Capturing Phase (sebelum event sampai ke script iklan)
-    ['click', 'touchstart', 'touchend', 'pointerdown', 'mousedown'].forEach(evt => {
-        window.addEventListener(evt, blockJunkClicks, true);
-        document.addEventListener(evt, blockJunkClicks, true);
-    });
 
     // =========================================================================
     // 2. INPUT KEY
@@ -83,9 +57,10 @@
     window.bagasXitLoaded = true;
 
     // =========================================================================
-    // 3. SAPU BERSIH IFRAME & OVERLAY TRANSPARAN
+    // 3. SAPU BERSIH LAYER JEBAKAN TRANSPARAN (AGAR SCREEN TIDAK MACET)
     // =========================================================================
     const cleanDOM = () => {
+        // Suntik CSS penyembunyi iklan
         if (!document.getElementById("bagasxit-adblock-css")) {
             const hideAdsStyle = document.createElement('style');
             hideAdsStyle.id = "bagasxit-adblock-css";
@@ -102,7 +77,7 @@
             (document.head || document.documentElement).appendChild(hideAdsStyle);
         }
 
-        // Hapus elemen transparan pembungkus layar
+        // Hapus elemen transparan pembungkus layar (penyebab macet/sekali klik langsung redirect)
         document.querySelectorAll('div, a, span, iframe').forEach(el => {
             if (el.closest('#bagasxit-root-container') || el.closest('#bagasxit-fab-container')) return;
 
@@ -110,12 +85,11 @@
             const isFixedOrAbs = style.position === 'fixed' || style.position === 'absolute';
             const isFullScreen = el.offsetWidth >= window.innerWidth * 0.7 && el.offsetHeight >= window.innerHeight * 0.7;
 
-            if (isFixedOrAbs && isFullScreen) {
+            // Jika elemen menutupi hampir seluruh layar dan punya z-index tinggi, ini pasti overlay jebakan
+            if (isFixedOrAbs && isFullScreen && style.zIndex !== '0') {
                 el.remove();
             }
         });
-
-        document.body.style.overflow = 'auto';
     };
 
     cleanDOM();
@@ -182,7 +156,7 @@
     // TOAST NOTIFIKASI
     const toast = document.createElement('div');
     toast.style = "position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(18,11,36,0.95); color:#E040FB; border:1px solid #8E24AA; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold; z-index:999999; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.5);";
-    toast.innerText = "⚡ V5 ULTIMATE SHIELD ACTIVE!";
+    toast.innerText = "⚡ V6 PERFECT ENGINE ACTIVE!";
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 })();
