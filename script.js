@@ -5,28 +5,53 @@
     }
 
     // =========================================================================
-    // 1. DUMMY & BLOCK POPUP WINDOW (POPUNDER KILLER)
+    // 1. ISOLASI TOTAL API NAVIGASI & POPUP (MENCEGAH REDIRECT SEPENUHNYA)
     // =========================================================================
-    window.open = function() { 
-        console.log("BAGASXIT: Pop-up diblokir.");
-        return null; 
-    };
+    // Block total window.open
+    window.open = function() { return null; };
 
-    // Filter URL redirect jebakan
+    // Neutralize location hijacking
     const isBadUrl = (url) => {
         if (!url) return false;
         const str = String(url).toLowerCase();
-        return str.includes('ay267') || str.includes('afu.php') || str.includes('qqslot') || str.includes('google.com/search?q=') || str.includes('rtp-');
+        return str.includes('ay267') || str.includes('afu.php') || str.includes('qqslot') || str.includes('google.com') || str.includes('rtp-') || str.includes('koko');
     };
 
-    // Overwrite HTMLAnchorElement click
-    const originalClick = HTMLElement.prototype.click;
-    HTMLElement.prototype.click = function() {
-        if (this.tagName === 'A' && isBadUrl(this.href)) {
-            return;
+    // Proxy Setter Location untuk memblokir perpindahan domain liar
+    try {
+        const oldLocation = window.location;
+        let fakeHref = oldLocation.href;
+        
+        // Block location methods
+        window.location.assign = function(url) { if (!isBadUrl(url)) oldLocation.assign(url); };
+        window.location.replace = function(url) { if (!isBadUrl(url)) oldLocation.replace(url); };
+    } catch(e) {}
+
+    // Blocker utama event klik global jebakan
+    const globalBlocker = function(e) {
+        let path = e.composedPath ? e.composedPath() : [];
+        let isAllowed = false;
+
+        for (let el of path) {
+            // Izinkan UI BagasXit
+            if (el.id === 'bagasxit-root-container' || el.id === 'bagasxit-fab-container') {
+                isAllowed = true;
+                break;
+            }
+            // Cegah jika elemen yang diklik membawa URL iklan
+            if (el.href && isBadUrl(el.href)) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                return false;
+            }
         }
-        return originalClick.apply(this, arguments);
     };
+
+    // Pasang Blocker di Capturing Phase Terdepan
+    ['click', 'touchstart', 'touchend', 'pointerdown', 'mousedown'].forEach(evt => {
+        window.addEventListener(evt, globalBlocker, true);
+    });
 
     // =========================================================================
     // 2. INPUT KEY
@@ -45,43 +70,8 @@
     window.bagasXitLoaded = true;
 
     // =========================================================================
-    // 3. AMANKAN TOMBOL-TOMBOL ASLI SITUS DARI JEBAKAN IKLAN
+    // 3. SAPU BERSIH & HAPUS OVERLAY JEBAKAN
     // =========================================================================
-    const sanitizeButtons = () => {
-        // Target elemen yang dilingkari (tombol, link, checkbox, dropdown)
-        const targets = document.querySelectorAll('button, a, input, label, div[role="button"], svg, path');
-        
-        targets.forEach(el => {
-            // Abaikan UI Bookmarklet sendiri
-            if (el.closest('#bagasxit-root-container') || el.closest('#bagasxit-fab-container')) return;
-
-            // Jika elemen adalah link iklan, netralkan
-            if (el.tagName === 'A' && isBadUrl(el.href)) {
-                el.href = "javascript:void(0)";
-                el.removeAttribute("target");
-            }
-
-            // Kloning elemen untuk membuang SEMUA Event Listener jebakan iklan yang menempel
-            if (!el.dataset.bagasxitCleaned) {
-                el.dataset.bagasxitCleaned = "true";
-                
-                // Hapus inline event handlers
-                el.onclick = null;
-                el.ontouchstart = null;
-                el.onmousedown = null;
-
-                // Stop event propagation ke script iklan saat tombol diklik
-                el.addEventListener('click', function(e) {
-                    if (el.tagName === 'A' && isBadUrl(el.href)) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }
-                }, true);
-            }
-        });
-    };
-
-    // Sapu bersih CSS & Overlay
     const cleanDOM = () => {
         if (!document.getElementById("bagasxit-adblock-css")) {
             const hideAdsStyle = document.createElement('style');
@@ -99,12 +89,28 @@
             (document.head || document.documentElement).appendChild(hideAdsStyle);
         }
 
-        sanitizeButtons();
+        // Hapus elemen transparan pembungkus layar
+        document.querySelectorAll('div, a, span, iframe').forEach(el => {
+            if (el.closest('#bagasxit-root-container') || el.closest('#bagasxit-fab-container')) return;
+
+            // Jika link mengarah ke domain iklan, langsung hapus elemennya dari DOM
+            if (el.tagName === 'A' && isBadUrl(el.href)) {
+                el.remove();
+                return;
+            }
+
+            const style = window.getComputedStyle(el);
+            const isFixedOrAbs = style.position === 'fixed' || style.position === 'absolute';
+            const isFullScreen = el.offsetWidth >= window.innerWidth * 0.7 && el.offsetHeight >= window.innerHeight * 0.7;
+
+            if (isFixedOrAbs && isFullScreen && style.zIndex !== '0') {
+                el.remove();
+            }
+        });
     };
 
     cleanDOM();
-    const observer = new MutationObserver(cleanDOM);
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    setInterval(cleanDOM, 500); // Sapu ulang tiap 0.5 detik untuk mematikan iklan yang muncul dinamis
 
     // =========================================================================
     // 4. ANIMASI NEON GLOW & FAB UI
@@ -166,7 +172,7 @@
     // TOAST NOTIFIKASI
     const toast = document.createElement('div');
     toast.style = "position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(18,11,36,0.95); color:#E040FB; border:1px solid #8E24AA; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold; z-index:999999; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.5);";
-    toast.innerText = "⚡ V7 PRECISION BUTTON CLEANSER ACTIVE!";
+    toast.innerText = "⚡ V8 ABSOLUTE QUARANTINE ACTIVE!";
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 })();
