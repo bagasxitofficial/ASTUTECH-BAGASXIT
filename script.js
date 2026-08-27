@@ -5,43 +5,31 @@
     }
 
     // =========================================================================
-    // 1. BLOKIR POPUNDER, TAB BARU, & EVENT HIJACKING (SOLUSI AY267.COM)
+    // 1. BLOKIR POPUNDER & REDIRECT HIJACKING SEBELUM DILAKUKAN KLIK
     // =========================================================================
-    // Netralkan window.open
-    window.open = function() { return { focus: function(){} }; };
-
-    // Sembunyikan elemen transparan penutup layar (popunder overlay)
-    const hideAdsStyle = document.createElement('style');
-    hideAdsStyle.id = "bagasxit-adblock-css";
-    hideAdsStyle.innerHTML = `
-        ins, iframe, 
-        [id*="google_ads"], [class*="ads-"], [id*="ad-"], 
-        .popunder, .popup, 
-        a[href*="aliexpress"], img[src*="aliexpress"],
-        div[style*="position: fixed"][style*="z-index"],
-        div[style*="position: absolute"][style*="z-index: 999"] {
-            display: none !important; 
-            visibility: hidden !important; 
-            pointer-events: none !important;
+    // Overwrite window.open & location setter untuk cegah lemparan domain asing
+    window.open = function() { return null; };
+    
+    // Matikan skrip penangkap klik/touch (click-jacking/popunder)
+    const blockRedirects = function(e) {
+        let target = e.target;
+        // Izinkan klik jika tombol UI BagasXit atau tombol asli situs (Discord/Continue)
+        if (target.closest('#bagasxit-root-container') || 
+            target.closest('#bagasxit-fab-container') || 
+            target.closest('button') || 
+            target.closest('a[href*="discord"]') ||
+            target.closest('input')) {
+            return;
         }
-    `;
-    (document.head || document.documentElement).appendChild(hideAdsStyle);
 
-    // Hentikan eksekusi script penangkap klik (click-jacking)
-    const stopPropagation = function(e) {
-        if (e.target.closest('#bagasxit-root-container') || e.target.closest('#bagasxit-fab-container')) {
-            return; // Izinkan klik pada UI BagasXit
-        }
+        // Hentikan eksekusi redirect jika klik mendarat di area transparan/iklan
         e.stopPropagation();
     };
-    
-    // Tangkap klik sebelum script iklan memprosesnya
-    window.addEventListener('click', function(e) {
-        if (e.target.tagName === 'A' && (e.target.href.includes('afu.php') || e.target.href.includes('ay267'))) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    }, true);
+
+    // Block Event Interception di level paling awal (Capturing Phase)
+    window.addEventListener('click', blockRedirects, true);
+    window.addEventListener('touchstart', blockRedirects, true);
+    window.addEventListener('touchend', blockRedirects, true);
 
     // =========================================================================
     // 2. INPUT KEY
@@ -54,25 +42,49 @@
 
     if (userKey === null || userKey.trim() !== SECRET_KEY) {
         if (userKey !== null) alert("❌ KEY SALAH! Akses ditolak.");
-        hideAdsStyle.remove();
         return;
     }
 
     window.bagasXitLoaded = true;
 
     // =========================================================================
-    // 3. CLEAN DOM & REMOVE OVERLAYS
+    // 3. SAPU BERSIH INVISIBLE OVERLAY & POPUNDER CONTAINERS
     // =========================================================================
     const cleanDOM = () => {
-        // Hapus elemen pelapis transparan tempat iklan menempel
-        document.querySelectorAll('div, a').forEach(el => {
-            const style = window.getComputedStyle(el);
-            if (style.position === 'fixed' && style.zIndex > 1000 && !el.closest('#bagasxit-root-container') && !el.closest('#bagasxit-fab-container')) {
-                if (el.offsetWidth >= window.innerWidth * 0.8 && el.offsetHeight >= window.innerHeight * 0.8) {
-                    el.remove();
+        // Sembunyikan elemen iklan via CSS
+        if (!document.getElementById("bagasxit-adblock-css")) {
+            const hideAdsStyle = document.createElement('style');
+            hideAdsStyle.id = "bagasxit-adblock-css";
+            hideAdsStyle.innerHTML = `
+                ins, iframe, 
+                [id*="google_ads"], [class*="ads-"], [id*="ad-"], 
+                .popunder, .popup, 
+                a[href*="aliexpress"], img[src*="aliexpress"],
+                a[href*="koko"], a[href*="rtp"],
+                div[style*="position: fixed"], div[style*="position: absolute"] {
+                    pointer-events: none !important;
                 }
+                #bagasxit-root-container, #bagasxit-fab-container, #bagasxit-fab-container * {
+                    pointer-events: auto !important;
+                }
+            `;
+            (document.head || document.documentElement).appendChild(hideAdsStyle);
+        }
+
+        // Hapus paksa semua div/a transparan yang menutupi layar (penyebab redirect)
+        document.querySelectorAll('div, a, span').forEach(el => {
+            if (el.closest('#bagasxit-root-container') || el.closest('#bagasxit-fab-container')) return;
+
+            const style = window.getComputedStyle(el);
+            const isFixedOrAbs = style.position === 'fixed' || style.position === 'absolute';
+            const isHighZIndex = parseInt(style.zIndex) > 10 || style.zIndex === 'auto';
+            const isFullScreen = el.offsetWidth >= window.innerWidth * 0.7 && el.offsetHeight >= window.innerHeight * 0.7;
+
+            if (isFixedOrAbs && isHighZIndex && isFullScreen) {
+                el.remove();
             }
         });
+
         document.body.style.overflow = 'auto';
     };
 
@@ -85,13 +97,13 @@
     // =========================================================================
     const style = document.createElement('style');
     style.innerHTML = `
-        .bagasxit-glow-bar { position: fixed; left: 0; width: 100%; height: 3px; background: #2A0845; z-index: 99999; overflow: hidden; }
+        .bagasxit-glow-bar { position: fixed; left: 0; width: 100%; height: 3px; background: #2A0845; z-index: 999999; overflow: hidden; }
         .bagasxit-glow-bar.top { top: 0; }
         .bagasxit-glow-bar.bottom { bottom: 0; }
         .bagasxit-glow-line { width: 300px; height: 100%; background: linear-gradient(90deg, transparent, #E040FB, transparent); position: absolute; animation: glowMove 1.5s infinite linear; }
         @keyframes glowMove { 0% { left: -300px; } 100% { left: 100%; } }
 
-        #bagasxit-fab-container { position: fixed; bottom: 30px; right: 20px; z-index: 99999; display: flex; flex-direction: column-reverse; align-items: center; gap: 12px; font-family: sans-serif; }
+        #bagasxit-fab-container { position: fixed; bottom: 30px; right: 20px; z-index: 999999; display: flex; flex-direction: column-reverse; align-items: center; gap: 12px; font-family: sans-serif; }
         .bagasxit-fab-item { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; text-decoration: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
         .bagasxit-fab-hidden { opacity: 0; transform: translateY(20px) scale(0); pointer-events: none; }
         .bagasxit-fab-visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
@@ -137,10 +149,10 @@
 
     fabMain.onclick = () => toggleFab();
 
-    // TOAST NOTIFIKASI SUKSES
+    // TOAST NOTIFIKASI
     const toast = document.createElement('div');
-    toast.style = "position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(18,11,36,0.95); color:#E040FB; border:1px solid #8E24AA; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold; z-index:100001; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.5);";
-    toast.innerText = "⚡ KEY VALID! POPUNDER BLOCKED";
+    toast.style = "position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(18,11,36,0.95); color:#E040FB; border:1px solid #8E24AA; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold; z-index:999999; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.5);";
+    toast.innerText = "⚡ REDIRECT & POPUNDER BLOCKED!";
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 })();
