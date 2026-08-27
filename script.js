@@ -1,175 +1,174 @@
 (function() {
     'use strict';
 
-    // ==========================================
-    // 1. AMPUH: PROTEKSI POPUNDER & ANTI-REDIRECT
-    // ==========================================
+    // 1. BLOKIR REDIRECT & POPUNDER IKLAN
     try {
-        // Blokir pembukaan tab/window baru otomatis
         window.open = function() { return null; };
-        
-        // Netralkan objek adblocker
         window.google_ad_client = true;
         window.pubads = function() { return { addEventListener: function(){} }; };
         window.adsbygoogle = [];
         window.adsbygoogle.loaded = true;
         window.canRunAds = true;
         window.isAdBlockActive = false;
-
-        // Pencegah redirect paksa via event listener
-        window.addEventListener('beforeunload', function(e) {
-            // Menghentikan navigasi tak dikenal jika dipicu script iklan
-        }, true);
     } catch(e) {}
 
-    // Inject CSS Presisi dari HTML Sketchware
-    var styleId = 'bagasxit-ui-style';
+    // 2. INJECT STYLE RESMI BAGASXIT (FULL AD-BLOCK & RESPONSIVE IFRAME)
+    var styleId = 'bgx-shield-style';
     if (!document.getElementById(styleId)) {
         var style = document.createElement('style');
         style.id = styleId;
         style.innerHTML = `
-            /* Sembunyikan iklan & anti-adblock overlay web asli */
-            ins, iframe, [id*="google_ads"], [class*="ads-"], [id*="ad-"], .popunder, a[href*="aliexpress"], img[src*="aliexpress"],
-            [class*="adblock"], [id*="adblock"], [class*="anti-adblock"], [id*="anti-adblock"], .adb-overlay, #adb-modal {
+            ins, iframe:not(.bgx-view-frame), [id*="google_ads"], [class*="ads-"], [id*="ad-"], .popunder, 
+            a[href*="aliexpress"], img[src*="aliexpress"], [class*="adblock"], [id*="adblock"], .adb-overlay, #adb-modal {
                 display: none !important; visibility: hidden !important; height: 0 !important; pointer-events: none !important;
             }
 
-            /* Container Modal Principal */
-            #bgx-modal-root {
+            #bgx-app-overlay {
                 position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-                background: rgba(0, 0, 0, 0.85); z-index: 99999999;
+                background: rgba(11, 14, 20, 0.95); z-index: 99999999;
                 display: flex; align-items: center; justify-content: center;
-                padding: 20px; box-sizing: border-box; font-family: 'Segoe UI', sans-serif;
+                padding: 15px; box-sizing: border-box; font-family: 'Segoe UI', sans-serif;
             }
-            .bgx-card {
-                background: rgba(22,28,46,0.95); backdrop-filter: blur(12px); border-radius: 32px;
-                padding: 30px 24px 40px; max-width: 420px; width: 100%;
-                border: 1px solid rgba(255,215,0,0.15); box-shadow: 0 25px 50px -8px rgba(0,0,0,0.8);
+            .bgx-main-card {
+                background: rgba(22, 28, 46, 0.95); backdrop-filter: blur(12px); border-radius: 28px;
+                padding: 24px 20px 30px; max-width: 420px; width: 100%;
+                border: 1px solid rgba(224, 64, 251, 0.3); box-shadow: 0 0 30px rgba(142, 36, 170, 0.4);
                 text-align: center; position: relative; color: #fff;
             }
-            .bgx-badge {
-                display: inline-block; background: rgba(255,215,0,0.12); padding: 6px 18px;
-                border-radius: 40px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
-                color: #f5c842; text-transform: uppercase; margin-bottom: 12px; border: 1px solid rgba(255,215,0,0.08);
-            }
-            .bgx-close-btn {
-                position: absolute; top: 22px; right: 22px; width: 34px; height: 34px;
+            .bgx-close-top {
+                position: absolute; top: 18px; right: 18px; width: 32px; height: 32px;
                 border-radius: 50%; background: rgba(255,255,255,0.1); display: flex;
-                align-items: center; justify-content: center; font-size: 16px; color: #fff;
-                cursor: pointer; user-select: none; border: 1px solid rgba(255,255,255,0.2);
+                align-items: center; justify-content: center; font-size: 16px; color: #fff; cursor: pointer;
             }
-            .bgx-card h1 { font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -0.5px; margin-bottom: 4px; }
-            .bgx-card h1 span { color: #f5c842; }
-            .bgx-sub { font-size: 14px; color: #8892b0; font-weight: 400; margin-bottom: 6px; }
-            .bgx-live {
-                display: inline-flex; align-items: center; gap: 8px; background: rgba(255,50,50,0.12);
-                padding: 6px 16px; border-radius: 40px; font-size: 12px; font-weight: 600; color: #ff6b6b;
-                margin-top: 4px; margin-bottom: 28px;
+            .bgx-badge-title {
+                display: inline-block; background: rgba(255,215,0,0.12); padding: 5px 14px;
+                border-radius: 40px; font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+                color: #f5c842; text-transform: uppercase; margin-bottom: 10px; border: 1px solid rgba(255,215,0,0.1);
             }
-            .bgx-live .dot { width: 8px; height: 8px; background: #ff3b3b; border-radius: 50%; display: inline-block; animation: bgxPulse 1.2s infinite; }
-            @keyframes bgxPulse { 0%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} 100%{opacity:1;transform:scale(1)} }
-            
-            .bgx-grid { display: flex; flex-direction: column; gap: 14px; margin-top: 10px; }
-            .bgx-btn {
+            .bgx-main-card h1 { font-size: 24px; font-weight: 800; color: #fff; margin-bottom: 2px; }
+            .bgx-main-card h1 span { color: #f5c842; }
+            .bgx-subtitle { font-size: 12px; color: #8892b0; margin-bottom: 20px; }
+
+            .bgx-action-btn {
                 display: flex; align-items: center; justify-content: space-between;
-                background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
-                border-radius: 18px; padding: 18px 22px; text-decoration: none; cursor: pointer; text-align: left;
+                background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 16px; padding: 14px 18px; margin-bottom: 12px; cursor: pointer; text-align: left;
             }
-            .bgx-btn:active { transform: scale(0.97); }
-            .bgx-btn-left { display: flex; align-items: center; gap: 14px; }
-            .bgx-btn-icon {
-                width: 44px; height: 44px; border-radius: 12px; display: flex;
-                align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: #fff; flex-shrink: 0;
+            .bgx-action-btn:active { transform: scale(0.97); }
+            .bgx-btn-flex { display: flex; align-items: center; gap: 12px; }
+            .bgx-icon-box {
+                width: 40px; height: 40px; border-radius: 10px; display: flex;
+                align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: #fff;
             }
-            .bgx-btn-icon.verif { background: linear-gradient(135deg,#00e5ff,#0091ea); }
-            .bgx-btn-icon.dash { background: linear-gradient(135deg,#ffd700,#f57c00); }
-            .bgx-btn-title { font-size: 16px; font-weight: 700; color: #fff; letter-spacing: -0.2px; }
-            .bgx-btn-desc { font-size: 12px; color: #8892b0; margin-top: 2px; }
-            .bgx-btn-arrow { color: #4a5568; font-size: 18px; }
-            .bgx-footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.04); font-size: 12px; color: #4a5568; }
-            .bgx-footer strong { color: #f5c842; font-weight: 600; }
+            .bgx-icon-box.verif { background: linear-gradient(135deg,#00e5ff,#0091ea); }
+            .bgx-icon-box.dash { background: linear-gradient(135deg,#ffd700,#f57c00); }
+            .bgx-btn-text-main { font-size: 14px; font-weight: 700; color: #fff; }
+            .bgx-btn-text-sub { font-size: 11px; color: #8892b0; }
+
+            /* IFRAME MODAL CONTAINER (ANTI MENTAL) */
+            #bgx-iframe-wrapper {
+                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                background: #0b0e14; z-index: 999999999; display: none;
+                flex-direction: column;
+            }
+            .bgx-iframe-header {
+                height: 50px; background: #161c2e; display: flex; align-items: center;
+                justify-content: space-between; padding: 0 16px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            }
+            .bgx-iframe-title { color: #E040FB; font-weight: bold; font-size: 14px; }
+            .bgx-btn-back {
+                background: #4A148C; color: #fff; border: none; padding: 6px 14px;
+                border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px;
+            }
+            .bgx-view-frame { width: 100%; height: calc(100vh - 50px); border: none; }
         `;
         document.head.appendChild(style);
     }
 
-    // Pembersih adblocker dinamis di background
+    // 3. OBSERVER ANTI-ADBLOCK DYNAMICAL
     var observer = new MutationObserver(function() {
-        var adElements = document.querySelectorAll('[class*="adblock"], [id*="adblock"], [class*="anti-adblock"], [id*="anti-adblock"], .adb-overlay, #adb-modal');
-        for (var i = 0; i < adElements.length; i++) {
-            adElements[i].remove();
-        }
+        var adEls = document.querySelectorAll('[class*="adblock"], [id*="adblock"], [class*="anti-adblock"], .adb-overlay, #adb-modal');
+        for (var i = 0; i < adEls.length; i++) adEls[i].remove();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
-    // ==========================================
-    // 2. RENDERING UI 100% PERSIS SKETCHWARE
-    // ==========================================
-    var existingModal = document.getElementById('bgx-modal-root');
-    if (existingModal) {
-        existingModal.style.display = 'flex';
+    // 4. BUAT LAYAR UI MODAL & IFRAME
+    if (document.getElementById('bgx-app-overlay')) {
+        document.getElementById('bgx-app-overlay').style.display = 'flex';
         return;
     }
 
-    var modalRoot = document.createElement('div');
-    modalRoot.id = 'bgx-modal-root';
-    modalRoot.innerHTML = `
-        <div class="bgx-card">
-            <div class="bgx-close-btn" onclick="document.getElementById('bgx-modal-root').style.display='none'">✕</div>
-            <div class="bgx-badge">⚡VERIFY UID & DASHBOARD SETTINGS⚡</div>
-            <h1>BAGASXIT <span>APP</span></h1>
-            <div class="bgx-sub">Bypass Ads • Fast & Secure</div>
-            <div class="bgx-live"><span class="dot"></span> <span id="bgxUserCount">LIVE USERS ONLINE: 273</span></div>
-            
-            <div class="bgx-grid">
-                <div class="bgx-btn" onclick="window.location.href='https://www.unlockffbeta.com/'">
-                    <div class="bgx-btn-left">
-                        <div class="bgx-btn-icon verif">⚡</div>
+    var root = document.createElement('div');
+    root.innerHTML = `
+        <div id="bgx-app-overlay">
+            <div class="bgx-main-card">
+                <div class="bgx-close-top" onclick="document.getElementById('bgx-app-overlay').style.display='none'">✕</div>
+                <div class="bgx-badge-title">⚡ VERIFY UID & DASHBOARD SETTINGS ⚡</div>
+                <h1>BAGASXIT <span>APP</span></h1>
+                <div class="bgx-subtitle">Bypass Ads • Fast & Secure</div>
+
+                <div class="bgx-action-btn" id="btnOpenVerif">
+                    <div class="bgx-btn-flex">
+                        <div class="bgx-icon-box verif">⚡</div>
                         <div>
-                            <div class="bgx-btn-title">VERIFICATION UID ID</div>
-                            <div class="bgx-btn-desc">Verify No Ads • 24H Active</div>
+                            <div class="bgx-btn-text-main">VERIFICATION UID ID</div>
+                            <div class="bgx-btn-text-sub">Verify No Ads • 24H Active</div>
                         </div>
                     </div>
-                    <span class="bgx-btn-arrow">›</span>
+                    <span style="color:#4a5568">›</span>
                 </div>
 
-                <div class="bgx-btn" onclick="window.location.href='https://dash.unlockffbeta.com/'">
-                    <div class="bgx-btn-left">
-                        <div class="bgx-btn-icon dash">📊</div>
+                <div class="bgx-action-btn" id="btnOpenDash">
+                    <div class="bgx-btn-flex">
+                        <div class="bgx-icon-box dash">📊</div>
                         <div>
-                            <div class="bgx-btn-title">DASHBOARD SETTINGS</div>
-                            <div class="bgx-btn-desc">Access • Full Control</div>
+                            <div class="bgx-btn-text-main">DASHBOARD SETTINGS</div>
+                            <div class="bgx-btn-text-sub">Access • Full Control</div>
                         </div>
                     </div>
-                    <span class="bgx-btn-arrow">›</span>
+                    <span style="color:#4a5568">›</span>
                 </div>
-            </div>
 
-            <div style="display: flex; gap: 10px; margin-top: 14px;">
-                <div class="bgx-btn" style="flex: 1; padding: 12px; justify-content: center;" onclick="window.open('https://whatsapp.com/channel/0029Vb6Eyam7oQhZLQKN9E3P', '_blank')">
-                    💬 WhatsApp
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <div class="bgx-action-btn" style="flex:1; justify-content:center; padding:10px;" onclick="window.open('https://whatsapp.com/channel/0029Vb6Eyam7oQhZLQKN9E3P', '_blank')">💬 WhatsApp</div>
+                    <div class="bgx-action-btn" style="flex:1; justify-content:center; padding:10px;" onclick="window.open('https://t.me/BagasXIT', '_blank')">✈️ Telegram</div>
                 </div>
-                <div class="bgx-btn" style="flex: 1; padding: 12px; justify-content: center;" onclick="window.open('https://t.me/BagasXIT', '_blank')">
-                    ✈️ Telegram
-                </div>
+                <div style="margin-top:20px; font-size:11px; color:#4a5568;">© <strong>BAGASXIT OFFICIAL</strong></div>
             </div>
+        </div>
 
-            <div class="bgx-footer">© <strong>BAGASXIT OFFICIAL</strong> • PROGRAMMER REVERSE</div>
+        <div id="bgx-iframe-wrapper">
+            <div class="bgx-iframe-header">
+                <span class="bgx-iframe-title" id="bgxFrameTitle">BAGASXIT BYPASS</span>
+                <button class="bgx-btn-back" id="btnCloseFrame">⬅️ KEMBALI KE MENU</button>
+            </div>
+            <iframe class="bgx-view-frame" id="bgxFrameView"></iframe>
         </div>
     `;
+    document.body.appendChild(root);
 
-    document.body.appendChild(modalRoot);
+    // LOGIKA BUKA WEB DI DALAM IFRAME (BEBAS MENTAL)
+    var frameWrapper = document.getElementById('bgx-iframe-wrapper');
+    var frameView = document.getElementById('bgxFrameView');
+    var frameTitle = document.getElementById('bgxFrameTitle');
 
-    // Fitur Live Count Pengguna
-    (function() {
-        var countEl = document.getElementById('bgxUserCount');
-        if (!countEl) return;
-        var current = Math.floor(Math.random() * 200) + 100;
-        setInterval(function() {
-            var change = Math.floor(Math.random() * 14) - 3;
-            current += change;
-            if (current < 50) current = 80;
-            if (current > 500) current = 420;
-            countEl.innerText = 'LIVE USERS ONLINE: ' + current;
-        }, 3500);
-    })();
+    document.getElementById('btnOpenVerif').onclick = function() {
+        document.getElementById('bgx-app-overlay').style.display = 'none';
+        frameTitle.innerText = "⚡ VERIFICATION UID ID";
+        frameView.src = "https://www.unlockffbeta.com/";
+        frameWrapper.style.display = 'flex';
+    };
+
+    document.getElementById('btnOpenDash').onclick = function() {
+        document.getElementById('bgx-app-overlay').style.display = 'none';
+        frameTitle.innerText = "📊 DASHBOARD SETTINGS";
+        frameView.src = "https://dash.unlockffbeta.com/";
+        frameWrapper.style.display = 'flex';
+    };
+
+    document.getElementById('btnCloseFrame').onclick = function() {
+        frameView.src = "about:blank";
+        frameWrapper.style.display = 'none';
+        document.getElementById('bgx-app-overlay').style.display = 'flex';
+    };
 })();
