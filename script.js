@@ -5,31 +5,47 @@
     }
 
     // =========================================================================
-    // 1. BLOKIR POPUNDER & REDIRECT HIJACKING SEBELUM DILAKUKAN KLIK
+    // 1. DUMP & NETRALKAN EVENT LISTENER IKLAN (POPUNDER KILLER)
     // =========================================================================
-    // Overwrite window.open & location setter untuk cegah lemparan domain asing
+    // Matikan pemanggilan fungsi redirect otomatis
     window.open = function() { return null; };
-    
-    // Matikan skrip penangkap klik/touch (click-jacking/popunder)
-    const blockRedirects = function(e) {
-        let target = e.target;
-        // Izinkan klik jika tombol UI BagasXit atau tombol asli situs (Discord/Continue)
-        if (target.closest('#bagasxit-root-container') || 
-            target.closest('#bagasxit-fab-container') || 
-            target.closest('button') || 
-            target.closest('a[href*="discord"]') ||
-            target.closest('input')) {
-            return;
+    delete window.ontouchstart;
+    delete window.onclick;
+    document.onclick = null;
+    document.ontouchstart = null;
+
+    // Hentikan propagasi event jika klik bukan ke tombol/input resmi
+    const killPopunder = function(e) {
+        const path = e.composedPath ? e.composedPath() : [];
+        let isLegitElement = false;
+
+        // Cek apakah area yang diklik adalah tombol valid (Discord, Login, atau UI BagasXit)
+        for (let el of path) {
+            if (el.id === 'bagasxit-root-container' || 
+                el.id === 'bagasxit-fab-container' || 
+                (el.tagName === 'A' && el.href && (el.href.includes('discord') || el.href.includes('unlockffbeta'))) ||
+                el.tagName === 'BUTTON' || 
+                el.tagName === 'INPUT' ||
+                el.tagName === 'LABEL') {
+                isLegitElement = true;
+                break;
+            }
         }
 
-        // Hentikan eksekusi redirect jika klik mendarat di area transparan/iklan
-        e.stopPropagation();
+        // Jika mengeklik area luar/kosong (tempat jebakan popunder berada), hentikan klik sepenuhnya
+        if (!isLegitElement) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            return false;
+        }
     };
 
-    // Block Event Interception di level paling awal (Capturing Phase)
-    window.addEventListener('click', blockRedirects, true);
-    window.addEventListener('touchstart', blockRedirects, true);
-    window.addEventListener('touchend', blockRedirects, true);
+    // Tangkap semua tipe gesture di Capturing Phase (Level Paling Luar)
+    ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown'].forEach(eventType => {
+        window.addEventListener(eventType, killPopunder, true);
+        document.addEventListener(eventType, killPopunder, true);
+    });
 
     // =========================================================================
     // 2. INPUT KEY
@@ -48,10 +64,9 @@
     window.bagasXitLoaded = true;
 
     // =========================================================================
-    // 3. SAPU BERSIH INVISIBLE OVERLAY & POPUNDER CONTAINERS
+    // 3. PEMBERSIH OVERLAY & IFRAME TERSEMBUNYI
     // =========================================================================
     const cleanDOM = () => {
-        // Sembunyikan elemen iklan via CSS
         if (!document.getElementById("bagasxit-adblock-css")) {
             const hideAdsStyle = document.createElement('style');
             hideAdsStyle.id = "bagasxit-adblock-css";
@@ -60,27 +75,23 @@
                 [id*="google_ads"], [class*="ads-"], [id*="ad-"], 
                 .popunder, .popup, 
                 a[href*="aliexpress"], img[src*="aliexpress"],
-                a[href*="koko"], a[href*="rtp"],
-                div[style*="position: fixed"], div[style*="position: absolute"] {
+                a[href*="koko"], a[href*="rtp"], a[href*="afu.php"] {
+                    display: none !important;
                     pointer-events: none !important;
-                }
-                #bagasxit-root-container, #bagasxit-fab-container, #bagasxit-fab-container * {
-                    pointer-events: auto !important;
                 }
             `;
             (document.head || document.documentElement).appendChild(hideAdsStyle);
         }
 
-        // Hapus paksa semua div/a transparan yang menutupi layar (penyebab redirect)
-        document.querySelectorAll('div, a, span').forEach(el => {
+        // Hapus paksa semua lapisan transparan yang menutupi layar
+        document.querySelectorAll('div, a, span, iframe').forEach(el => {
             if (el.closest('#bagasxit-root-container') || el.closest('#bagasxit-fab-container')) return;
 
             const style = window.getComputedStyle(el);
             const isFixedOrAbs = style.position === 'fixed' || style.position === 'absolute';
-            const isHighZIndex = parseInt(style.zIndex) > 10 || style.zIndex === 'auto';
             const isFullScreen = el.offsetWidth >= window.innerWidth * 0.7 && el.offsetHeight >= window.innerHeight * 0.7;
 
-            if (isFixedOrAbs && isHighZIndex && isFullScreen) {
+            if (isFixedOrAbs && isFullScreen) {
                 el.remove();
             }
         });
@@ -93,7 +104,7 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
     // =========================================================================
-    // 4. ANIMASI NEON GLOW & FAB
+    // 4. ANIMASI NEON GLOW & FAB UI
     // =========================================================================
     const style = document.createElement('style');
     style.innerHTML = `
@@ -152,7 +163,7 @@
     // TOAST NOTIFIKASI
     const toast = document.createElement('div');
     toast.style = "position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(18,11,36,0.95); color:#E040FB; border:1px solid #8E24AA; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold; z-index:999999; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.5);";
-    toast.innerText = "⚡ REDIRECT & POPUNDER BLOCKED!";
+    toast.innerText = "⚡ V4 POPUNDER & REDIRECT BLOCKED!";
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 })();
