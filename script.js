@@ -7,22 +7,19 @@
     // =========================================================================
     // 1. ISOLASI NAVIGASI & BLOKIR SPAM WINDOW.OPEN
     // =========================================================================
-    // Matikan pemanggilan tab baru oleh iklan
     window.open = function() { 
-        console.log("BAGASXIT: Pop-up diblokir total.");
+        console.log("BAGASXIT: Pop-up diblokir.");
         return null; 
     };
 
-    // Filter kata kunci URL iklan
     const isBadUrl = (url) => {
         if (!url) return false;
         const str = String(url).toLowerCase();
         return str.includes('ay267') || str.includes('afu.php') || str.includes('qqslot') || 
                str.includes('google.com/search') || str.includes('rtp-') || str.includes('koko') ||
-               str.includes('aliexpress') || str.includes('directlink');
+               str.includes('aliexpress') || str.includes('directlink') || str.includes('bonus');
     };
 
-    // Cegah skrip iklan memicu klik tersembunyi lewat tag <a>
     const originalClick = HTMLElement.prototype.click;
     HTMLElement.prototype.click = function() {
         if (this.tagName === 'A' && isBadUrl(this.href)) return;
@@ -46,47 +43,72 @@
     window.bagasXitLoaded = true;
 
     // =========================================================================
-    // 3. INJEKSI STYLESHEET (MEMATIKAN IKLAN MENGEMBANG & NEMPEL)
+    // 3. PEMBERSIH IKLAN PRESISI (AMAN UNTUK CLOUDFLARE TURNSTILE)
     // =========================================================================
-    const injectGlobalCSS = () => {
-        if (document.getElementById("bagasxit-v10-css")) return;
+    const cleanDOM = () => {
+        // CSS pemblokir banner iklan tanpa merusak Turnstile
+        if (!document.getElementById("bagasxit-v11-css")) {
+            const hideAdsStyle = document.createElement('style');
+            hideAdsStyle.id = "bagasxit-v11-css";
+            hideAdsStyle.innerHTML = `
+                ins, 
+                [id*="google_ads"], [class*="ads-"], [id*="ad-"],
+                .popunder, .popup, 
+                a[href*="aliexpress"], img[src*="aliexpress"],
+                a[href*="koko"], a[href*="rtp"], a[href*="afu.php"], a[href*="ay267"] {
+                    display: none !important;
+                    pointer-events: none !important;
+                }
+            `;
+            (document.head || document.documentElement).appendChild(hideAdsStyle);
+        }
 
-        const style = document.createElement('style');
-        style.id = "bagasxit-v10-css";
-        style.innerHTML = `
-            /* Sembunyikan elemen iklan yang menempel/mengembang */
-            ins, iframe, 
-            [id*="google_ads"], [class*="ads-"], [id*="ad-"], [class*="ad-"],
-            .popunder, .popup, div[class*="banner"], div[id*="banner"],
-            a[href*="aliexpress"], img[src*="aliexpress"],
-            a[href*="koko"], a[href*="rtp"], a[href*="afu.php"], a[href*="ay267"] {
-                display: none !important;
-                visibility: hidden !important;
-                pointer-events: none !important;
+        // Hapus banner iklan yang muncul di atas (BONUS MEWAH TERBUKA, dll)
+        document.querySelectorAll('div, iframe, a, span, img').forEach(el => {
+            // Lindungi UI BagasXit & Cloudflare Turnstile Widget
+            if (el.closest('#bagasxit-root-container') || 
+                el.closest('#bagasxit-fab-container') || 
+                el.closest('iframe[src*="cloudflare"]') || 
+                el.closest('iframe[src*="turnstile"]') ||
+                el.id?.includes('cf-') || el.className?.includes('cf-')) {
+                return;
             }
 
-            /* Matikan event klik pada div melayang/mengembang pemicu iklan */
-            div[style*="position: fixed"], div[style*="position: absolute"] {
-                pointer-events: auto;
+            // Hapus berdasarkan teks banner iklan judi/bonus
+            const text = el.innerText || "";
+            if (text.includes("BONUS MEWAH TERBUKA") || text.includes("WOW! Kamu BERUNTUNG") || text.includes("Cek BONUS di sini")) {
+                el.remove();
+                return;
             }
-        `;
-        (document.head || document.documentElement).appendChild(style);
+
+            // Hapus overlay transparan penuh layar yang melayang di atas form
+            const style = window.getComputedStyle(el);
+            const isFixedOrAbs = style.position === 'fixed' || style.position === 'absolute';
+            const isFullScreen = el.offsetWidth >= window.innerWidth * 0.7 && el.offsetHeight >= window.innerHeight * 0.7;
+
+            if (isFixedOrAbs && isFullScreen && style.zIndex !== '0' && style.zIndex !== 'auto') {
+                if (style.opacity === "0" || style.backgroundColor.includes("rgba(0, 0, 0, 0)")) {
+                    el.remove();
+                }
+            }
+        });
     };
 
-    // =========================================================================
-    // 4. CEGAT DAN NETRALKAN EVENT KETUKAN (MENGATASI OVERLAY TRANSPARAN)
-    // =========================================================================
+    // CEGAT EVENT TRANSPARENT OVERLAY
     const stopInvisibleTraps = (e) => {
         const path = e.composedPath ? e.composedPath() : [];
-        let isUI = false;
+        let isUIOrTurnstile = false;
 
         for (let el of path) {
-            // Izinkan interaksi untuk UI Bookmarklet sendiri
-            if (el.id === 'bagasxit-root-container' || el.id === 'bagasxit-fab-container') {
-                isUI = true;
+            // Izinkan jika klik dilakukan di UI Bookmarklet, Form Input UID, Tombol Verify, atau Turnstile
+            if (el.id === 'bagasxit-root-container' || 
+                el.id === 'bagasxit-fab-container' || 
+                el.tagName === 'INPUT' || 
+                el.tagName === 'BUTTON' ||
+                el.tagName === 'IFRAME') {
+                isUIOrTurnstile = true;
                 break;
             }
-            // Blokir event jika yang diklik adalah link iklan tersembunyi
             if (el.tagName === 'A' && isBadUrl(el.href)) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -95,17 +117,15 @@
             }
         }
 
-        if (isUI) return;
+        if (isUIOrTurnstile) return;
 
-        // Periksa apakah target klik adalah lapisan transparan (Overlay)
         const target = e.target;
         if (target && target !== document.body && target !== document.documentElement) {
             const style = window.getComputedStyle(target);
-            const isTransparent = style.opacity === "0" || style.backgroundColor === "rgba(0, 0, 0, 0)" || style.visibility === "hidden";
+            const isTransparent = style.opacity === "0" || style.backgroundColor === "rgba(0, 0, 0, 0)";
             const isFixed = style.position === "fixed" || style.position === "absolute";
             
-            // Jika diklik adalah elemen transparan yang melayang (jebakan popunder), hapus elemen tersebut
-            if (isFixed && isTransparent && !target.closest('#bagasxit-root-container') && !target.closest('#bagasxit-fab-container')) {
+            if (isFixed && isTransparent) {
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
@@ -115,47 +135,15 @@
         }
     };
 
-    // Pasang blocker di Capturing Phase (sebelum event ditangkap oleh script iklan)
     ['click', 'touchstart', 'pointerdown', 'mousedown'].forEach(evt => {
         window.addEventListener(evt, stopInvisibleTraps, true);
     });
 
-    // =========================================================================
-    // 5. DOM SANITIZER (PEMBERSIH ELEMEN BERKALA)
-    // =========================================================================
-    const cleanDOM = () => {
-        injectGlobalCSS();
-
-        // Cari dan hapus elemen iklan berdasarkan karakteristik
-        document.querySelectorAll('div, iframe, a, span, img').forEach(el => {
-            if (el.closest('#bagasxit-root-container') || el.closest('#bagasxit-fab-container')) return;
-
-            // 1. Hapus berdasarkan teks banner iklan (DANA, Slot, Bonus)
-            const text = el.innerText || "";
-            if (text.includes("DANA: Rp") || text.includes("bonus yang belum digunakan") || text.includes("Ambil uangmu sekarang")) {
-                el.remove();
-                return;
-            }
-
-            // 2. Hapus elemen transparan penuh layar
-            const style = window.getComputedStyle(el);
-            const isFixedOrAbs = style.position === 'fixed' || style.position === 'absolute';
-            const isFullScreen = el.offsetWidth >= window.innerWidth * 0.7 && el.offsetHeight >= window.innerHeight * 0.7;
-
-            if (isFixedOrAbs && isFullScreen && style.zIndex !== '0' && style.zIndex !== 'auto') {
-                // Periksa apakah elemen ini memiliki latar belakang/konten asli atau hanya transparan
-                if (style.opacity === "0" || style.backgroundColor.includes("rgba(0, 0, 0, 0)")) {
-                    el.remove();
-                }
-            }
-        });
-    };
-
     cleanDOM();
-    setInterval(cleanDOM, 400); // Pembersihan otomatis setiap 400ms
+    setInterval(cleanDOM, 400);
 
     // =========================================================================
-    // 6. ANIMASI NEON GLOW & FAB UI
+    // 4. ANIMASI NEON GLOW & FAB UI
     // =========================================================================
     const style = document.createElement('style');
     style.innerHTML = `
@@ -214,7 +202,7 @@
     // TOAST NOTIFIKASI
     const toast = document.createElement('div');
     toast.style = "position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(18,11,36,0.95); color:#E040FB; border:1px solid #8E24AA; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold; z-index:999999; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.5);";
-    toast.innerText = "⚡ V10 NUCLEAR ENGINE ACTIVE!";
+    toast.innerText = "⚡ V11 TURNSTILE SAFE ENGINE ACTIVE!";
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 })();
